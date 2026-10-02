@@ -1,0 +1,23 @@
+{
+	"$schema": "../node_modules/@companion-module/base/assets/manifest.schema.json",
+	"type": "connection",
+	"id": "goalake-switch",
+	"name": "Goalake PoE Switch",
+	"shortname": "GoalakePoE",
+	"description": "Port-level PoE control and status monitoring for Goalake / OEM PoE switches using Realtek reference firmware",
+	"version": "0.0.0",
+	"license": "MIT",
+	"repository": "git+https://github.com/bitfocus/companion-module-goalake-switch.git",
+	"bugs": "https://github.com/bitfocus/companion-module-goalake-switch/issues",
+	"maintainers": [{ "name": "itota" }],
+	"runtime": {
+		"type": "node22",
+		"api": "nodejs-ipc",
+		"apiVersion": "0.0.0",
+		"entrypoint": "../dist/main.js"
+	},
+	"legacyIds": [],
+	"manufacturer": "Goalake",
+	"products": ["5-Port PoE Switch (B099PKV69M)", "Easy Smart Managed Switch"],
+	"keywords": ["poe", "switch", "network", "power"]
+}
