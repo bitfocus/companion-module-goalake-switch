@@ -10,6 +10,8 @@ The protocol notes below summarize the confirmed PS104GV3 behavior needed for de
 
 ## Development
 
+Use Node.js 22.20 or newer within the 22.x release line and Yarn 4 via Corepack.
+
 ```sh
 corepack enable
 yarn install
@@ -19,19 +21,23 @@ yarn lint       # eslint + prettier
 yarn test       # unit tests (node:test)
 ```
 
-Point Companion's *Developer modules path* at the parent directory of this folder,
+Point Companion's _Developer modules path_ at the parent directory of this folder,
 then add a "Goalake PoE Switch" connection. Companion restarts the connection on
 every file save, so `yarn dev` gives a live reload loop.
 
+GitHub Actions runs build, lint, and unit tests on pushes and pull requests.
+The official Companion Module Checks workflow also packages the module and checks
+that it loads. Its `pkg` artifact can be downloaded for manual distribution.
+
 ## Source layout
 
-| File | Responsibility |
-|---|---|
-| `src/main.ts` | `InstanceBase` subclass: lifecycle, session handling, polling loop |
-| `src/switch-client.ts` | HTTP transport for the device's `callcmd` protocol |
-| `src/device-state.ts` | Pure parsing of the `callcmd 101` payload + opcode/port-index maths |
-| `src/config.ts` | Connection config fields (host, secret password, poll interval, port order) |
-| `src/actions.ts` / `src/feedbacks.ts` / `src/variables.ts` / `src/presets.ts` | Companion surface |
+| File                                                                          | Responsibility                                                              |
+| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `src/main.ts`                                                                 | `InstanceBase` subclass: lifecycle, session handling, polling loop          |
+| `src/switch-client.ts`                                                        | HTTP transport for the device's `callcmd` protocol                          |
+| `src/device-state.ts`                                                         | Pure parsing of the `callcmd 101` payload + opcode/port-index maths         |
+| `src/config.ts`                                                               | Connection config fields (host, secret password, poll interval, port order) |
+| `src/actions.ts` / `src/feedbacks.ts` / `src/variables.ts` / `src/presets.ts` | Companion surface                                                           |
 
 `src/device-state.ts` deliberately has no Companion imports so it can be unit tested
 in isolation; `src/device-state.test.ts` covers the opcode encoding, the reversed
