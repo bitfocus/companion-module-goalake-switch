@@ -1,12 +1,10 @@
 import { generateEslintConfig } from '@companion-module/tools/eslint/config.mjs'
 
+const baseConfig = await generateEslintConfig({ enableTypescript: true })
+
 export default [
-	{ ignores: ['dist/', 'dist-test/'] },
-	...(await generateEslintConfig({
-		enableTypescript: true,
-	})),
+	...baseConfig,
 	{
-		// describe()/it() from node:test return promises that are not meant to be awaited
 		files: ['**/*.test.ts'],
 		rules: { '@typescript-eslint/no-floating-promises': 'off' },
 	},

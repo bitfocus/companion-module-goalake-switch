@@ -8,6 +8,8 @@ import {
 	parseDetail,
 	portToIndex,
 	PortConfigMode,
+	PortConfigValidationError,
+	resolvePortConfigIndex,
 } from './device-state.js'
 
 /**
@@ -73,6 +75,40 @@ describe('portToIndex', () => {
 	it('leaves the uplink ports at their trailing indices', () => {
 		assert.equal(portToIndex(5, 4, 5, true), 4)
 		assert.equal(portToIndex(5, 4, 5, false), 4)
+	})
+})
+
+describe('resolvePortConfigIndex', () => {
+	it('uses the actual device layout rather than assumed port counts', () => {
+		const state = parseDetail({ sn: 'PS104GV3', link: [5, 5, 5], poec: [1, 1] }, 'auto')
+		assert.equal(resolvePortConfigIndex(state, 1, 'auto', true), 1)
+		assert.equal(resolvePortConfigIndex(state, 3, 'auto', false), 2)
+	})
+
+	it('rejects unknown or inconsistent port counts', () => {
+		for (const state of [
+			parseDetail({}, 'normal'),
+			parseDetail({ link: [5], pw: [0, 0] }, 'normal'),
+			parseDetail({ link: Array<number>(33).fill(5) }, 'normal'),
+		]) {
+			assert.throws(() => resolvePortConfigIndex(state, 1, 'normal', false), PortConfigValidationError)
+		}
+	})
+
+	it('requires a serial for automatic order but permits explicit order', () => {
+		const detail = { link: [5, 5, 5], poec: [1, 1] }
+		assert.throws(() => resolvePortConfigIndex(parseDetail(detail, 'auto'), 1, 'auto', true), PortConfigValidationError)
+		assert.equal(resolvePortConfigIndex(parseDetail(detail, 'normal'), 1, 'normal', true), 0)
+		assert.equal(resolvePortConfigIndex(parseDetail(detail, 'reversed'), 1, 'reversed', true), 1)
+	})
+
+	it('rejects invalid port numbers and PoE writes to the uplink', () => {
+		const state = parseDetail(detailFixture, 'auto')
+		for (const port of [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 6]) {
+			assert.throws(() => resolvePortConfigIndex(state, port, 'auto', false), PortConfigValidationError)
+		}
+		assert.throws(() => resolvePortConfigIndex(state, 5, 'auto', true), PortConfigValidationError)
+		assert.equal(resolvePortConfigIndex(state, 5, 'auto', false), 4)
 	})
 })
 

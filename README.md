@@ -26,8 +26,11 @@ then add a "Goalake PoE Switch" connection. Companion restarts the connection on
 every file save, so `yarn dev` gives a live reload loop.
 
 GitHub Actions runs build, lint, and unit tests on pushes and pull requests.
-The official Companion Module Checks workflow also packages the module and checks
+On pushes, the official Companion Module Checks workflow also packages the module and checks
 that it loads. Its `pkg` artifact can be downloaded for manual distribution.
+
+Tests compile into `dist/test/`, which is excluded by the shared ESLint configuration.
+The template's Husky pre-commit hook runs formatting and lint checks on staged files.
 
 ## Source layout
 
@@ -41,7 +44,9 @@ that it loads. Its `pkg` artifact can be downloaded for manual distribution.
 
 `src/device-state.ts` deliberately has no Companion imports so it can be unit tested
 in isolation; `src/device-state.test.ts` covers the opcode encoding, the reversed
-port-order detection, the firmware-dependent power scaling and the detail parser.
+port-order detection, port-command validation, the firmware-dependent power scaling
+and the detail parser. `src/main.test.ts` covers state recovery before port writes
+and cancellation of stale connection operations using mocked device requests.
 
 ## Protocol notes that shape the code
 
@@ -59,6 +64,10 @@ port-order detection, the firmware-dependent power scaling and the detail parser
   Only the PoE ports are reversed; the uplink remains last. Auto-detection uses serial prefixes
   adapted from [slydiman/sscpoe](https://github.com/slydiman/sscpoe), with `PS1` added for this model.
   A manual override is available for other models.
+- Port writes require a known, valid device layout. If state is unknown, the module
+  reads detail before calculating the port index; it refuses the write if acquisition
+  fails or automatic order detection has no serial number. Reboot remains independent
+  of detail acquisition.
 
 ## Deliberately not implemented
 

@@ -14,8 +14,9 @@ import { SwitchClient, SwitchCommandError, SwitchConnectionError } from './switc
 import {
 	buildOpcode,
 	parseDetail,
-	portToIndex,
 	PortConfigMode,
+	PortConfigValidationError,
+	resolvePortConfigIndex,
 	type DeviceState,
 	type PortConfigModeValue,
 	type PortStatus,
@@ -37,6 +38,8 @@ const AssumedPoePortCount = 4
 
 /** Backed off up to this ceiling once login/poll attempts keep failing, e.g. while another client holds the device's single session. */
 const MaxPollBackoffMs = 300_000
+
+class CommandCancelledError extends Error {}
 
 export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	#config: ModuleConfig = DefaultConfig
@@ -110,8 +113,10 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	}
 
 	async setPoe(port: number, on: boolean): Promise<void> {
-		const index = portToIndex(port, this.poePortCount, this.portCount, this.#state?.reversedOrder ?? false)
 		await this.#runCommand(async (client) => {
+			const state = await this.#ensurePortState(client)
+			this.#assertCurrentClient(client)
+			const index = resolvePortConfigIndex(state, port, this.#config.portOrder, true)
 			await client.setPortConfig(buildOpcode(on ? PortConfigMode.PoeOn : PortConfigMode.PoeOff, index))
 		})
 		await this.pollNow()
@@ -122,12 +127,15 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 	 * which is how 100M-only ports answer a 1G request.
 	 */
 	async setPortMode(port: number, mode: PortConfigModeValue, fallback?: PortConfigModeValue): Promise<void> {
-		const index = portToIndex(port, this.poePortCount, this.portCount, this.#state?.reversedOrder ?? false)
 		await this.#runCommand(async (client) => {
+			const state = await this.#ensurePortState(client)
+			this.#assertCurrentClient(client)
+			const index = resolvePortConfigIndex(state, port, this.#config.portOrder, false)
 			try {
 				await client.setPortConfig(buildOpcode(mode, index))
 			} catch (e) {
 				if (fallback === undefined || !(e instanceof SwitchCommandError) || e.errcode !== 1001) throw e
+				this.#assertCurrentClient(client)
 				this.log('debug', `Port ${port}: mode 0x${mode.toString(16)} was rejected; falling back`)
 				await client.setPortConfig(buildOpcode(fallback, index))
 			}
@@ -202,19 +210,48 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 		try {
 			await this.#ensureSession(client)
-			return await fn(client)
+			this.#assertCurrentClient(client)
+			const result = await fn(client)
+			this.#assertCurrentClient(client)
+			return result
 		} catch (e) {
-			client.clearSession()
-			this.#setDisconnected(this.#describeAndLogError(e))
+			if (e instanceof PortConfigValidationError || e instanceof CommandCancelledError) {
+				this.log('warn', e.message)
+			} else {
+				client.clearSession()
+				if (client === this.#client && !this.#destroyed) {
+					this.#setDisconnected(this.#describeAndLogError(e))
+				}
+			}
 			throw e
 		}
 	}
 
+	#assertCurrentClient(client: SwitchClient): void {
+		if (client !== this.#client || this.#destroyed) {
+			throw new CommandCancelledError('接続が変更または削除されたため、操作を中止しました')
+		}
+	}
+
+	async #ensurePortState(client: SwitchClient): Promise<DeviceState> {
+		let state = this.#state
+		if (!state) {
+			const calldata = await client.getDetail()
+			this.#assertCurrentClient(client)
+			state = this.#applyDetail(calldata)
+		}
+		this.#assertCurrentClient(client)
+		return state
+	}
+
 	async #ensureSession(client: SwitchClient): Promise<void> {
 		if (client.hasSession) return
-		this.#loginPromise ??= client.login(this.#password).finally(() => {
-			this.#loginPromise = undefined
-		})
+		if (!this.#loginPromise) {
+			const loginPromise = client.login(this.#password).finally(() => {
+				if (this.#loginPromise === loginPromise) this.#loginPromise = undefined
+			})
+			this.#loginPromise = loginPromise
+		}
 		await this.#loginPromise
 	}
 
@@ -224,13 +261,17 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 
 		try {
 			await this.#ensureSession(client)
+			this.#assertCurrentClient(client)
 			const calldata = await client.getDetail()
+			this.#assertCurrentClient(client)
 			this.#applyDetail(calldata)
 		} catch (e) {
 			client.clearSession()
-			this.#setDisconnected(this.#describeAndLogError(e))
+			if (client === this.#client && !this.#destroyed) {
+				this.#setDisconnected(this.#describeAndLogError(e))
+			}
 		} finally {
-			this.#scheduleNextPoll()
+			if (client === this.#client && !this.#destroyed) this.#scheduleNextPoll()
 		}
 	}
 
@@ -241,7 +282,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		return message
 	}
 
-	#applyDetail(calldata: Record<string, unknown>): void {
+	#applyDetail(calldata: Record<string, unknown>): DeviceState {
 		const previous = this.#state
 		const state = parseDetail(calldata, this.#config.portOrder)
 		this.#state = state
@@ -260,6 +301,7 @@ export default class ModuleInstance extends InstanceBase<ModuleSchema> {
 		this.checkAllFeedbacks()
 		this.updateStatus(InstanceStatus.Ok)
 		this.#consecutiveFailures = 0
+		return state
 	}
 
 	#setDisconnected(message: string): void {

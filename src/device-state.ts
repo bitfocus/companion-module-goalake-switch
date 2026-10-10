@@ -86,6 +86,28 @@ export interface DeviceState {
 	ports: PortStatus[]
 }
 
+export class PortConfigValidationError extends Error {}
+
+export function resolvePortConfigIndex(state: DeviceState, port: number, order: PortOrder, poeOnly: boolean): number {
+	if (
+		!Number.isInteger(state.portCount) ||
+		state.portCount < 1 ||
+		state.portCount > 32 ||
+		!Number.isInteger(state.poePortCount) ||
+		state.poePortCount < 0 ||
+		state.poePortCount > state.portCount
+	) {
+		throw new PortConfigValidationError('ポート構成を確認できないため、操作を中止しました')
+	}
+	if (order === 'auto' && !state.serial?.trim()) {
+		throw new PortConfigValidationError('ポート順の自動判定に必要なシリアル番号を取得できないため、操作を中止しました')
+	}
+	if (!Number.isInteger(port) || port < 1 || port > state.portCount || (poeOnly && port > state.poePortCount)) {
+		throw new PortConfigValidationError(`ポート ${port} はこの操作の対象にできません`)
+	}
+	return portToIndex(port, state.poePortCount, state.portCount, state.reversedOrder)
+}
+
 function numberArray(value: unknown): number[] | undefined {
 	if (!Array.isArray(value)) return undefined
 	return value.map((v) => Number(v))

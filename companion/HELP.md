@@ -11,13 +11,13 @@ The device must provide a web administration interface at `http://<switch-ip>/`.
 
 ## Configuration
 
-| Field | Description |
-|---|---|
-| Switch IP address | The same IP address used by the web administration interface |
-| Administrator password | Web administration password, stored as a Companion secret and never exposed in logs or variables |
-| State poll interval | Default 5 seconds. Keep it at or below 60 seconds because the switch session expires after about 3 minutes |
-| Request timeout | Maximum wait for one HTTP request, default 5 seconds |
-| Port order | See Port order below |
+| Field                  | Description                                                                                                |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Switch IP address      | The same IP address used by the web administration interface                                               |
+| Administrator password | Web administration password, stored as a Companion secret and never exposed in logs or variables           |
+| State poll interval    | Default 5 seconds. Keep it at or below 60 seconds because the switch session expires after about 3 minutes |
+| Request timeout        | Maximum wait for one HTTP request, default 5 seconds                                                       |
+| Port order             | See Port order below                                                                                       |
 
 ## Important limitations
 
@@ -35,8 +35,8 @@ The switch does not support HTTPS. All traffic, including the administrator pass
 
 Some models expose API ports in the reverse of their physical numbering. Testing confirmed that this model (`PS104GV3` / `2FE.POE+2GE.POE+1GE`, firmware `6.0.250516`) reverses **only the PoE ports**; the uplink remains last. Auto-detection treats serial numbers beginning with `PS1` as reversed.
 
-| Array index | 0 | 1 | 2 | 3 | 4 |
-|---|---|---|---|---|---|
+| Array index   | 0      | 1      | 2      | 3      | 4               |
+| ------------- | ------ | ------ | ------ | ------ | --------------- |
 | Physical port | Port 4 | Port 3 | Port 2 | Port 1 | `LAN1` (uplink) |
 
 Companion ports 1-4 are PoE ports, and port 5 is `LAN1` (uplink). Select Normal or Reversed manually if another model does not match this layout.
@@ -45,12 +45,18 @@ The `$(this connection:port_order)` variable reports the active order (`normal` 
 
 ## Actions
 
-| Action | Description |
-|---|---|
-| Set PoE power | Turn PoE ON, OFF, or toggle it for a selected port |
+| Action                       | Description                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Set PoE power                | Turn PoE ON, OFF, or toggle it for a selected port                                                        |
 | Set port speed / Extend mode | Select 1G, 100M, 10M, or Extend (10M full duplex). A rejected 1G request automatically falls back to 100M |
-| Refresh state now | Retrieve state immediately instead of waiting for the next poll |
-| Reboot switch (DANGER) | See the warning below |
+| Refresh state now            | Retrieve state immediately instead of waiting for the next poll                                           |
+| Reboot switch (DANGER)       | See the warning below                                                                                     |
+
+PoE の ON/OFF・速度設定は、状態が不明な場合にスイッチの状態を取得してから実行します。
+取得に失敗した場合や対象ポートを確認できない場合は、設定を書き込みません。
+ポート順が Auto-detect の場合、シリアル番号が取得できなければ操作を中止します。
+その場合は実機の並び順を確認し、Normal または Reversed を明示的に設定してください。
+Toggle は従来どおり、現在の PoE 状態が不明な場合には実行しません。
 
 ### Reboot warning
 
@@ -62,11 +68,11 @@ Factory reset, firmware upgrade, configuration restore, and serial-number reset 
 
 ## Feedbacks
 
-| Feedback | Description |
-|---|---|
-| PoE power state | Changes the button color when the selected port is powered or not powered |
-| Link state | Changes the button color when the selected port is linked or unlinked |
-| Switch reachable | Reports whether this connection can communicate with the switch |
+| Feedback         | Description                                                               |
+| ---------------- | ------------------------------------------------------------------------- |
+| PoE power state  | Changes the button color when the selected port is powered or not powered |
+| Link state       | Changes the button color when the selected port is linked or unlinked     |
+| Switch reachable | Reports whether this connection can communicate with the switch           |
 
 ## Variables
 
@@ -99,9 +105,9 @@ Preset buttons are regenerated after the connection discovers the switch port co
 
 ## Troubleshooting
 
-| Symptom | Check |
-|---|---|
-| Status remains `Connection failure` | Close the web administration interface and wait about 2 minutes. Check the IP address and password |
-| Turning off PoE affects another port | Switch Port order between Normal and Reversed |
-| Port speed does not change | The port may not support the requested speed; this model includes 100M-only ports |
-| State updates are slow | Reduce the poll interval, but do not use less than 1-2 seconds because the switch HTTP server has limited capacity |
+| Symptom                              | Check                                                                                                              |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Status remains `Connection failure`  | Close the web administration interface and wait about 2 minutes. Check the IP address and password                 |
+| Turning off PoE affects another port | Switch Port order between Normal and Reversed                                                                      |
+| Port speed does not change           | The port may not support the requested speed; this model includes 100M-only ports                                  |
+| State updates are slow               | Reduce the poll interval, but do not use less than 1-2 seconds because the switch HTTP server has limited capacity |
